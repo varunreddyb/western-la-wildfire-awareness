@@ -1182,8 +1182,8 @@ st.divider()
 st.subheader("📱 Wildfire Alert Subscription")
 
 st.caption(
-    "Enter a mobile number to receive alerts when a zone becomes "
-    "High/Critical, increases significantly, or changes risk category."
+    "Enter a mobile number to receive wildfire alerts when a zone "
+    "becomes High/Critical, increases significantly, or changes risk category."
 )
 
 phone_number = st.text_input(
@@ -1192,7 +1192,7 @@ phone_number = st.text_input(
 )
 
 agree = st.checkbox(
-    "I want to receive wildfire situational-awareness alerts."
+    "I agree to receive wildfire situational-awareness SMS alerts."
 )
 
 if st.button(
@@ -1200,16 +1200,24 @@ if st.button(
     use_container_width=True,
 ):
 
-    if not phone_number:
+    cleaned_phone = phone_number.strip()
+
+    if not cleaned_phone:
 
         st.warning(
             "Enter a mobile number."
         )
 
-    elif not phone_number.startswith("+"):
+    elif not cleaned_phone.startswith("+"):
 
         st.warning(
             "Use international format, for example +17145551234."
+        )
+
+    elif not cleaned_phone[1:].isdigit():
+
+        st.warning(
+            "Enter a valid phone number using digits only after the + sign."
         )
 
     elif not agree:
@@ -1220,22 +1228,18 @@ if st.button(
 
     else:
 
-        safe_phone = (
-            phone_number
-            .strip()
-            .replace("'", "")
-        )
+        safe_phone = cleaned_phone.replace("'", "")
 
         insert_query = f"""
         MERGE INTO
-        dbw_sce_wildfire_dev.default.wildfire_alert_subscribers t
+            dbw_sce_wildfire_dev.default.wildfire_alert_subscribers AS t
 
         USING (
             SELECT
                 '{safe_phone}' AS phone_number,
                 TRUE AS active,
                 current_timestamp() AS created_at
-        ) s
+        ) AS s
 
         ON t.phone_number = s.phone_number
 
