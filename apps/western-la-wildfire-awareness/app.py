@@ -3,6 +3,7 @@ import os
 import pandas as pd
 import pydeck as pdk
 import streamlit as st
+import time
 
 from databricks import sql
 from databricks.sdk.core import Config
@@ -1259,21 +1260,44 @@ if st.button(
                 s.created_at
             )
         """
+max_retries = 3
 
-        try:
+for attempt in range(max_retries):
 
-            with get_connection() as conn:
+    try:
 
-                with conn.cursor() as cursor:
+        with get_connection() as conn:
+            with conn.cursor() as cursor:
+                cursor.execute(insert_query)
 
-                    cursor.execute(
-                        insert_query
-                    )
+        st.success(
+            "✅ Alert subscription activated."
+        )
 
-            st.success(
-                "✅ Alert subscription activated."
+        break
+
+    except Exception as e:
+
+        error_text = str(e)
+
+        if (
+            "DELTA_CONCURRENT_APPEND" in error_text
+            and attempt < max_retries - 1
+        ):
+
+            time.sleep(1.5)
+
+        else:
+
+            st.error(
+                "Unable to save the alert subscription."
             )
 
+            st.code(
+                error_text
+            )
+
+            break
         except Exception as e:
 
             st.error(
