@@ -110,7 +110,7 @@ def load_current_data():
 
 
 # ============================================================
-# LOAD HISTORY
+# LOAD HISTORY DATA
 # ============================================================
 
 @st.cache_data(ttl=300)
@@ -227,6 +227,7 @@ df = df.dropna(
 df["zone_label"] = df["zone_label"].fillna(
     df["zone_id"]
 )
+
 
 df["location_name"] = df["location_name"].fillna(
     "Western Los Angeles County"
@@ -359,7 +360,7 @@ ranked_df = df.sort_values(
 
 
 # ============================================================
-# ZONE SELECTION - MOVED ABOVE MAP
+# ZONE SELECTION
 # ============================================================
 
 st.subheader(
@@ -368,9 +369,7 @@ st.subheader(
 
 
 zone_options = (
-    ranked_df[
-        "zone_label"
-    ]
+    ranked_df["zone_label"]
     .dropna()
     .tolist()
 )
@@ -489,7 +488,7 @@ else:
 
 
 # ============================================================
-# EXPLICIT MAP COLORS
+# MAP COLOR STYLE
 # ============================================================
 
 def map_style(category):
@@ -543,13 +542,17 @@ for col in [
 
 
 # ============================================================
-# MAP AND PRIORITY TABLE
+# MAP + PRIORITY TABLE
 # ============================================================
 
 map_col, table_col = st.columns(
-    [2.25, 1]
+    [2.1, 1]
 )
 
+
+# ============================================================
+# MAP
+# ============================================================
 
 with map_col:
 
@@ -558,10 +561,6 @@ with map_col:
     )
 
 
-    # --------------------------------------------------------
-    # LEGEND
-    # --------------------------------------------------------
-
     l1, l2, l3, l4 = st.columns(4)
 
     l1.markdown("🟢 **Low**")
@@ -569,10 +568,6 @@ with map_col:
     l3.markdown("🟠 **High**")
     l4.markdown("🔴 **Critical**")
 
-
-    # --------------------------------------------------------
-    # BASE RISK LAYER
-    # --------------------------------------------------------
 
     risk_layer = pdk.Layer(
         "ScatterplotLayer",
@@ -614,10 +609,6 @@ with map_col:
     )
 
 
-    # --------------------------------------------------------
-    # HIGHLIGHT SELECTED ZONE
-    # --------------------------------------------------------
-
     selected_map_df = df[
         df["zone_id"]
         == selected_zone_id
@@ -657,10 +648,6 @@ with map_col:
     )
 
 
-    # --------------------------------------------------------
-    # MAP VIEW
-    # --------------------------------------------------------
-
     view_state = pdk.ViewState(
         latitude=34.105,
         longitude=-118.705,
@@ -669,10 +656,6 @@ with map_col:
         bearing=0,
     )
 
-
-    # --------------------------------------------------------
-    # TOOLTIP
-    # --------------------------------------------------------
 
     tooltip = {
         "html": (
@@ -713,7 +696,7 @@ with map_col:
 
 
 # ============================================================
-# TOP PRIORITY TABLE
+# CLEAN TOP PRIORITY TABLE
 # ============================================================
 
 with table_col:
@@ -728,7 +711,8 @@ with table_col:
         .head(10)
         [
             [
-                "zone_label",
+                "location_name",
+                "zone_id",
                 "risk_score",
                 "risk_category",
                 "risk_change",
@@ -736,23 +720,107 @@ with table_col:
                 "relative_humidity_pct",
             ]
         ]
-        .rename(
-            columns={
-                "zone_label": "Zone",
-                "risk_score": "Risk",
-                "risk_category": "Category",
-                "risk_change": "Δ Risk",
-                "wind_gust_mph": "Gust",
-                "relative_humidity_pct": "RH %",
-            }
-        )
+        .copy()
+    )
+
+
+    # Cleaner display name
+    top10["Zone"] = (
+        top10["location_name"]
+        .astype(str)
+        + " — "
+        + top10["zone_id"]
+        .astype(str)
+    )
+
+
+    # Round values for easier scanning
+    top10["Risk"] = (
+        top10["risk_score"]
+        .round(1)
+    )
+
+
+    top10["Δ Risk"] = (
+        top10["risk_change"]
+        .round(1)
+    )
+
+
+    top10["Gust"] = (
+        top10["wind_gust_mph"]
+        .round(1)
+    )
+
+
+    top10["Humidity"] = (
+        top10["relative_humidity_pct"]
+        .round(0)
+        .astype("Int64")
+    )
+
+
+    top10["Category"] = (
+        top10["risk_category"]
+    )
+
+
+    top10_display = top10[
+        [
+            "Zone",
+            "Risk",
+            "Category",
+            "Δ Risk",
+            "Gust",
+            "Humidity",
+        ]
+    ]
+
+
+    st.caption(
+        "Highest-priority zones ranked by current risk score."
     )
 
 
     st.dataframe(
-        top10,
+        top10_display,
         use_container_width=True,
         hide_index=True,
+        column_config={
+            "Zone": st.column_config.TextColumn(
+                "Zone",
+                width="large",
+            ),
+
+            "Risk": st.column_config.NumberColumn(
+                "Risk",
+                format="%.1f",
+                width="small",
+            ),
+
+            "Category": st.column_config.TextColumn(
+                "Category",
+                width="small",
+            ),
+
+            "Δ Risk": st.column_config.NumberColumn(
+                "Δ Risk",
+                format="%+.1f",
+                width="small",
+            ),
+
+            "Gust": st.column_config.NumberColumn(
+                "Gust",
+                format="%.1f mph",
+                width="small",
+            ),
+
+            "Humidity": st.column_config.NumberColumn(
+                "RH",
+                format="%d%%",
+                width="small",
+            ),
+        },
     )
 
 
@@ -760,7 +828,7 @@ st.divider()
 
 
 # ============================================================
-# SELECTED ZONE KPIs
+# SELECTED ZONE DETAILS
 # ============================================================
 
 st.subheader(
@@ -802,7 +870,7 @@ m5.metric(
 
 
 # ============================================================
-# ZONE CONTEXT + RISK DRIVERS
+# CONTEXT + RISK DRIVERS
 # ============================================================
 
 context_col, driver_col = st.columns(
