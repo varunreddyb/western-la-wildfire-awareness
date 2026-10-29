@@ -224,7 +224,6 @@ df = df.dropna(
 ).copy()
 
 
-# Make labels safe
 df["zone_label"] = df["zone_label"].fillna(
     df["zone_id"]
 )
@@ -347,7 +346,7 @@ st.divider()
 
 
 # ============================================================
-# HIGHEST RISK ZONE
+# RANK ZONES
 # ============================================================
 
 ranked_df = df.sort_values(
@@ -359,9 +358,81 @@ ranked_df = df.sort_values(
 ).copy()
 
 
-highest_row = ranked_df.iloc[0]
+# ============================================================
+# ZONE SELECTION - MOVED ABOVE MAP
+# ============================================================
 
-highest_zone_id = highest_row["zone_id"]
+st.subheader(
+    "Zone Investigation"
+)
+
+
+zone_options = (
+    ranked_df[
+        "zone_label"
+    ]
+    .dropna()
+    .tolist()
+)
+
+
+selected_zone_label = st.selectbox(
+    "Select a zone to investigate",
+    zone_options,
+    index=0,
+)
+
+
+selected = (
+    df[
+        df["zone_label"]
+        == selected_zone_label
+    ]
+    .iloc[0]
+)
+
+
+selected_zone_id = selected[
+    "zone_id"
+]
+
+
+# ============================================================
+# SELECTED ZONE STATUS
+# ============================================================
+
+category = selected[
+    "risk_category"
+]
+
+
+if category == "Critical":
+
+    st.error(
+        f"🔴 Investigating: {selected_zone_label} "
+        f"— Critical Risk"
+    )
+
+elif category == "High":
+
+    st.warning(
+        f"🟠 Investigating: {selected_zone_label} "
+        f"— High Risk"
+    )
+
+elif category == "Moderate":
+
+    st.info(
+        f"🟡 Investigating: {selected_zone_label} "
+        f"— Moderate Risk"
+    )
+
+else:
+
+    st.success(
+        f"🟢 Investigating: {selected_zone_label} "
+        f"— Low Risk"
+    )
 
 
 # ============================================================
@@ -404,8 +475,6 @@ if map_view == "Priority Zones":
     ].copy()
 
 
-    # If there are no active alerts,
-    # show the top 25 zones instead.
     if map_df.empty:
 
         map_df = (
@@ -459,7 +528,6 @@ map_df[
 ].apply(map_style)
 
 
-# Force numeric types
 for col in [
     "color_r",
     "color_g",
@@ -491,7 +559,7 @@ with map_col:
 
 
     # --------------------------------------------------------
-    # Native Streamlit legend — no custom HTML
+    # LEGEND
     # --------------------------------------------------------
 
     l1, l2, l3, l4 = st.columns(4)
@@ -503,7 +571,7 @@ with map_col:
 
 
     # --------------------------------------------------------
-    # Base risk layer
+    # BASE RISK LAYER
     # --------------------------------------------------------
 
     risk_layer = pdk.Layer(
@@ -547,30 +615,30 @@ with map_col:
 
 
     # --------------------------------------------------------
-    # Highlight current highest-risk zone
+    # HIGHLIGHT SELECTED ZONE
     # --------------------------------------------------------
 
-    highlight_df = df[
+    selected_map_df = df[
         df["zone_id"]
-        == highest_zone_id
+        == selected_zone_id
     ].copy()
 
 
     highlight_layer = pdk.Layer(
         "ScatterplotLayer",
 
-        data=highlight_df,
+        data=selected_map_df,
 
         get_position=[
             "longitude",
             "latitude",
         ],
 
-        get_radius=1300,
+        get_radius=1400,
 
-        radius_min_pixels=12,
+        radius_min_pixels=13,
 
-        radius_max_pixels=18,
+        radius_max_pixels=20,
 
         filled=False,
 
@@ -590,7 +658,7 @@ with map_col:
 
 
     # --------------------------------------------------------
-    # Western LA map view
+    # MAP VIEW
     # --------------------------------------------------------
 
     view_state = pdk.ViewState(
@@ -603,7 +671,7 @@ with map_col:
 
 
     # --------------------------------------------------------
-    # Tooltip
+    # TOOLTIP
     # --------------------------------------------------------
 
     tooltip = {
@@ -639,8 +707,8 @@ with map_col:
 
 
     st.caption(
-        "Black ring indicates the current highest-risk zone. "
-        "Hover over a marker for current conditions."
+        "Black ring indicates the selected investigation zone. "
+        "Hover over any marker for current conditions."
     )
 
 
@@ -692,80 +760,13 @@ st.divider()
 
 
 # ============================================================
-# ZONE INVESTIGATION
+# SELECTED ZONE KPIs
 # ============================================================
 
 st.subheader(
-    "Zone Investigation"
+    "Selected Zone Details"
 )
 
-
-zone_options = (
-    ranked_df[
-        "zone_label"
-    ]
-    .dropna()
-    .tolist()
-)
-
-
-selected_zone_label = st.selectbox(
-    "Select a zone",
-    zone_options,
-    index=0,
-)
-
-
-selected = (
-    df[
-        df["zone_label"]
-        == selected_zone_label
-    ]
-    .iloc[0]
-)
-
-
-# ============================================================
-# NATIVE STATUS BANNER
-# ============================================================
-
-category = selected[
-    "risk_category"
-]
-
-
-if category == "Critical":
-
-    st.error(
-        f"🔴 Investigating: {selected_zone_label} "
-        f"— Critical Risk"
-    )
-
-elif category == "High":
-
-    st.warning(
-        f"🟠 Investigating: {selected_zone_label} "
-        f"— High Risk"
-    )
-
-elif category == "Moderate":
-
-    st.info(
-        f"🟡 Investigating: {selected_zone_label} "
-        f"— Moderate Risk"
-    )
-
-else:
-
-    st.success(
-        f"🟢 Investigating: {selected_zone_label} "
-        f"— Low Risk"
-    )
-
-
-# ============================================================
-# SELECTED ZONE KPIs
-# ============================================================
 
 m1, m2, m3, m4, m5 = st.columns(5)
 
@@ -958,11 +959,6 @@ st.divider()
 st.subheader(
     "Risk Trend"
 )
-
-
-selected_zone_id = selected[
-    "zone_id"
-]
 
 
 zone_history = (
