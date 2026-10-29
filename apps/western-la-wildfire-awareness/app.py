@@ -3,7 +3,6 @@ import os
 import pandas as pd
 import pydeck as pdk
 import streamlit as st
-import time
 
 from databricks import sql
 from databricks.sdk.core import Config
@@ -35,6 +34,10 @@ CURRENT_TABLE = (
 
 HISTORY_TABLE = (
     "dbw_sce_wildfire_dev.default.wildfire_gold_history"
+)
+
+SUBSCRIBER_TABLE = (
+    "dbw_sce_wildfire_dev.default.wildfire_alert_subscribers"
 )
 
 
@@ -697,7 +700,7 @@ with map_col:
 
 
 # ============================================================
-# CLEAN TOP PRIORITY TABLE
+# TOP PRIORITY TABLE
 # ============================================================
 
 with table_col:
@@ -725,7 +728,6 @@ with table_col:
     )
 
 
-    # Cleaner display name
     top10["Zone"] = (
         top10["location_name"]
         .astype(str)
@@ -735,7 +737,6 @@ with table_col:
     )
 
 
-    # Round values for easier scanning
     top10["Risk"] = (
         top10["risk_score"]
         .round(1)
@@ -788,6 +789,7 @@ with table_col:
         use_container_width=True,
         hide_index=True,
         column_config={
+
             "Zone": st.column_config.TextColumn(
                 "Zone",
                 width="large",
@@ -1160,6 +1162,148 @@ else:
 
 
 # ============================================================
+# ALERT SUBSCRIPTION
+# ============================================================
+
+st.divider()
+
+
+st.subheader(
+    "📱 Wildfire Alert Subscription"
+)
+
+
+st.caption(
+    "Enter a mobile number to receive wildfire alerts when a zone "
+    "becomes High/Critical, increases significantly, or changes risk category."
+)
+
+
+phone_number = st.text_input(
+    "Mobile Number",
+    placeholder="+17145551234",
+)
+
+
+agree = st.checkbox(
+    "I agree to receive wildfire situational-awareness SMS alerts."
+)
+
+
+if st.button(
+    "Subscribe to Alerts",
+    use_container_width=True,
+):
+
+    cleaned_phone = (
+        phone_number
+        .strip()
+        .replace(" ", "")
+        .replace("-", "")
+        .replace("(", "")
+        .replace(")", "")
+    )
+
+
+    if not cleaned_phone:
+
+        st.warning(
+            "Enter a mobile number."
+        )
+
+
+    elif not cleaned_phone.startswith("+"):
+
+        st.warning(
+            "Use international format, for example +17145551234."
+        )
+
+
+    elif not cleaned_phone[1:].isdigit():
+
+        st.warning(
+            "Enter a valid phone number using digits only after the + sign."
+        )
+
+
+    elif len(cleaned_phone) < 10 or len(cleaned_phone) > 16:
+
+        st.warning(
+            "Enter a valid international mobile number."
+        )
+
+
+    elif not agree:
+
+        st.warning(
+            "Please confirm that you want to receive alerts."
+        )
+
+
+    else:
+
+        safe_phone = (
+            cleaned_phone
+            .replace("'", "")
+        )
+
+
+        # Simple append-only write.
+        # Notebook 12 removes duplicates before sending SMS.
+
+        insert_query = f"""
+        INSERT INTO {SUBSCRIBER_TABLE}
+        (
+            phone_number,
+            active,
+            created_at
+        )
+        VALUES
+        (
+            '{safe_phone}',
+            TRUE,
+            current_timestamp()
+        )
+        """
+
+
+        try:
+
+            with get_connection() as conn:
+
+                with conn.cursor() as cursor:
+
+                    cursor.execute(
+                        insert_query
+                    )
+
+
+            masked_phone = (
+                "*" * max(
+                    len(cleaned_phone) - 4,
+                    0
+                )
+                + cleaned_phone[-4:]
+            )
+
+
+            st.success(
+                f"✅ Alert subscription activated for {masked_phone}."
+            )
+
+
+        except Exception as e:
+
+            st.error(
+                "Unable to save the alert subscription."
+            )
+
+            st.code(
+                str(e)
+            )
+
+
+# ============================================================
 # DISCLAIMER
 # ============================================================
 
@@ -1174,136 +1318,3 @@ st.caption(
     "measure and is not intended to reproduce SCE proprietary wildfire-risk "
     "or PSPS decision models."
 )
-# ============================================================
-# ALERT SUBSCRIPTION
-# ============================================================
-
-st.divider()
-
-st.subheader("📱 Wildfire Alert Subscription")
-
-st.caption(
-    "Enter a mobile number to receive wildfire alerts when a zone "
-    "becomes High/Critical, increases significantly, or changes risk category."
-)
-
-phone_number = st.text_input(
-    "Mobile Number",
-    placeholder="+17145551234",
-)
-
-agree = st.checkbox(
-    "I agree to receive wildfire situational-awareness SMS alerts."
-)
-
-if st.button(
-    "Subscribe to Alerts",
-    use_container_width=True,
-):
-
-    cleaned_phone = phone_number.strip()
-
-    if not cleaned_phone:
-
-        st.warning(
-            "Enter a mobile number."
-        )
-
-    elif not cleaned_phone.startswith("+"):
-
-        st.warning(
-            "Use international format, for example +17145551234."
-        )
-
-    elif not cleaned_phone[1:].isdigit():
-
-        st.warning(
-            "Enter a valid phone number using digits only after the + sign."
-        )
-
-    elif not agree:
-
-        st.warning(
-            "Please confirm that you want to receive alerts."
-        )
-
-    else:
-
-        safe_phone = cleaned_phone.replace("'", "")
-
-        insert_query = f"""
-        MERGE INTO
-            dbw_sce_wildfire_dev.default.wildfire_alert_subscribers AS t
-
-        USING (
-            SELECT
-                '{safe_phone}' AS phone_number,
-                TRUE AS active,
-                current_timestamp() AS created_at
-        ) AS s
-
-        ON t.phone_number = s.phone_number
-
-        WHEN MATCHED THEN
-            UPDATE SET
-                active = TRUE
-
-        WHEN NOT MATCHED THEN
-            INSERT (
-                phone_number,
-                active,
-                created_at
-            )
-            VALUES (
-                s.phone_number,
-                s.active,
-                s.created_at
-            )
-        """
-max_retries = 3
-
-for attempt in range(max_retries):
-
-    try:
-
-        with get_connection() as conn:
-            with conn.cursor() as cursor:
-                cursor.execute(insert_query)
-
-        st.success(
-            "✅ Alert subscription activated."
-        )
-
-        break
-
-    except Exception as e:
-
-        error_text = str(e)
-
-        if (
-            "DELTA_CONCURRENT_APPEND" in error_text
-            and attempt < max_retries - 1
-        ):
-
-            time.sleep(1.5)
-
-        else:
-
-            st.error(
-                "Unable to save the alert subscription."
-            )
-
-            st.code(
-                error_text
-            )
-
-            break
-        except Exception as e:
-
-            st.error(
-                "Unable to save the alert subscription."
-            )
-
-            st.code(
-                str(e)
-            )
