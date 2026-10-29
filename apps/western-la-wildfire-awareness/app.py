@@ -1173,3 +1173,109 @@ st.caption(
     "measure and is not intended to reproduce SCE proprietary wildfire-risk "
     "or PSPS decision models."
 )
+# ============================================================
+# ALERT SUBSCRIPTION
+# ============================================================
+
+st.divider()
+
+st.subheader("📱 Wildfire Alert Subscription")
+
+st.caption(
+    "Enter a mobile number to receive alerts when a zone becomes "
+    "High/Critical, increases significantly, or changes risk category."
+)
+
+phone_number = st.text_input(
+    "Mobile Number",
+    placeholder="+17145551234",
+)
+
+agree = st.checkbox(
+    "I want to receive wildfire situational-awareness alerts."
+)
+
+if st.button(
+    "Subscribe to Alerts",
+    use_container_width=True,
+):
+
+    if not phone_number:
+
+        st.warning(
+            "Enter a mobile number."
+        )
+
+    elif not phone_number.startswith("+"):
+
+        st.warning(
+            "Use international format, for example +17145551234."
+        )
+
+    elif not agree:
+
+        st.warning(
+            "Please confirm that you want to receive alerts."
+        )
+
+    else:
+
+        safe_phone = (
+            phone_number
+            .strip()
+            .replace("'", "")
+        )
+
+        insert_query = f"""
+        MERGE INTO
+        dbw_sce_wildfire_dev.default.wildfire_alert_subscribers t
+
+        USING (
+            SELECT
+                '{safe_phone}' AS phone_number,
+                TRUE AS active,
+                current_timestamp() AS created_at
+        ) s
+
+        ON t.phone_number = s.phone_number
+
+        WHEN MATCHED THEN
+            UPDATE SET
+                active = TRUE
+
+        WHEN NOT MATCHED THEN
+            INSERT (
+                phone_number,
+                active,
+                created_at
+            )
+            VALUES (
+                s.phone_number,
+                s.active,
+                s.created_at
+            )
+        """
+
+        try:
+
+            with get_connection() as conn:
+
+                with conn.cursor() as cursor:
+
+                    cursor.execute(
+                        insert_query
+                    )
+
+            st.success(
+                "✅ Alert subscription activated."
+            )
+
+        except Exception as e:
+
+            st.error(
+                "Unable to save the alert subscription."
+            )
+
+            st.code(
+                str(e)
+            )
