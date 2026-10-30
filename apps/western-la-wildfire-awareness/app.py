@@ -30,6 +30,10 @@ HISTORY_TABLE = (
     "dbw_sce_wildfire_dev.default.wildfire_gold_history"
 )
 
+SUBSCRIBER_TABLE = (
+    "dbw_sce_wildfire_dev.default.wildfire_alert_subscribers"
+)
+
 
 # ============================================================
 # DATABRICKS OAUTH CONNECTION
@@ -61,7 +65,9 @@ def get_connection():
             client_secret=client_secret,
         )
 
-        return oauth_service_principal(config)
+        return oauth_service_principal(
+            config
+        )
 
     return sql.connect(
         server_hostname=server_hostname,
@@ -472,8 +478,7 @@ category = selected[
 if category == "Critical":
 
     st.error(
-        f"🔴 Investigating: "
-        f"{selected_zone_label} "
+        f"🔴 Investigating: {selected_zone_label} "
         f"— Critical Risk"
     )
 
@@ -481,8 +486,7 @@ if category == "Critical":
 elif category == "High":
 
     st.warning(
-        f"🟠 Investigating: "
-        f"{selected_zone_label} "
+        f"🟠 Investigating: {selected_zone_label} "
         f"— High Risk"
     )
 
@@ -490,8 +494,7 @@ elif category == "High":
 elif category == "Moderate":
 
     st.info(
-        f"🟡 Investigating: "
-        f"{selected_zone_label} "
+        f"🟡 Investigating: {selected_zone_label} "
         f"— Moderate Risk"
     )
 
@@ -499,8 +502,7 @@ elif category == "Moderate":
 else:
 
     st.success(
-        f"🟢 Investigating: "
-        f"{selected_zone_label} "
+        f"🟢 Investigating: {selected_zone_label} "
         f"— Low Risk"
     )
 
@@ -529,9 +531,7 @@ if map_view == "Priority Zones":
 
     map_df = df[
         (
-            df[
-                "risk_category"
-            ].isin(
+            df["risk_category"].isin(
                 [
                     "High",
                     "Critical",
@@ -540,15 +540,11 @@ if map_view == "Priority Zones":
         )
         |
         (
-            df[
-                "risk_change"
-            ] >= 10
+            df["risk_change"] >= 10
         )
         |
         (
-            df[
-                "category_changed"
-            ] == True
+            df["category_changed"] == True
         )
     ].copy()
 
@@ -676,7 +672,6 @@ with map_col:
 
     l1, l2, l3, l4 = st.columns(4)
 
-
     l1.markdown(
         "🟢 **Low**"
     )
@@ -785,15 +780,11 @@ with map_col:
     tooltip = {
         "html": (
             "<b>{zone_label}</b><br/>"
-            "Risk: <b>{risk_score}</b> "
-            "({risk_category})<br/>"
+            "Risk: <b>{risk_score}</b> ({risk_category})<br/>"
             "Change: <b>{risk_change}</b><br/>"
-            "Wind gust: "
-            "<b>{wind_gust_mph} mph</b><br/>"
-            "Humidity: "
-            "<b>{relative_humidity_pct}%</b><br/>"
-            "Temperature: "
-            "<b>{temperature_f} °F</b>"
+            "Wind gust: <b>{wind_gust_mph} mph</b><br/>"
+            "Humidity: <b>{relative_humidity_pct}%</b><br/>"
+            "Temperature: <b>{temperature_f} °F</b>"
         )
     }
 
@@ -819,9 +810,8 @@ with map_col:
 
 
     st.caption(
-        "Black ring indicates the selected "
-        "investigation zone. Hover over any "
-        "marker for current conditions."
+        "Black ring indicates the selected investigation zone. "
+        "Hover over any marker for current conditions."
     )
 
 
@@ -908,8 +898,7 @@ with table_col:
 
 
     st.caption(
-        "Highest-priority zones ranked "
-        "by current risk score."
+        "Highest-priority zones ranked by current risk score."
     )
 
 
@@ -1025,20 +1014,17 @@ with context_col:
 
 
     st.write(
-        f"**Zone ID:** "
-        f"{selected['zone_id']}"
+        f"**Zone ID:** {selected['zone_id']}"
     )
 
 
     st.write(
-        f"**Location:** "
-        f"{selected['location_name']}"
+        f"**Location:** {selected['location_name']}"
     )
 
 
     st.write(
-        f"**Risk Category:** "
-        f"{selected['risk_category']}"
+        f"**Risk Category:** {selected['risk_category']}"
     )
 
 
@@ -1221,8 +1207,7 @@ zone_history = (
 if zone_history.empty:
 
     st.info(
-        "No historical snapshots "
-        "are available for this zone."
+        "No historical snapshots are available for this zone."
     )
 
 
@@ -1288,9 +1273,8 @@ alert_df = df[
 if alert_df.empty:
 
     st.success(
-        "✅ No active High/Critical, "
-        "major risk-increase, or "
-        "category-change alerts."
+        "✅ No active High/Critical, major risk-increase, "
+        "or category-change alerts."
     )
 
 
@@ -1306,9 +1290,8 @@ else:
 
 
     st.warning(
-        f"⚠️ {len(alert_df)} zone(s) "
-        f"currently meet the operational "
-        f"alert criteria."
+        f"⚠️ {len(alert_df)} zone(s) currently meet "
+        f"the operational alert criteria."
     )
 
 
@@ -1323,23 +1306,12 @@ else:
         ]
     ].rename(
         columns={
-            "zone_label":
-                "Zone",
-
-            "risk_score":
-                "Risk",
-
-            "risk_category":
-                "Category",
-
-            "risk_change":
-                "Δ Risk",
-
-            "wind_gust_mph":
-                "Gust",
-
-            "relative_humidity_pct":
-                "RH %",
+            "zone_label": "Zone",
+            "risk_score": "Risk",
+            "risk_category": "Category",
+            "risk_change": "Δ Risk",
+            "wind_gust_mph": "Gust",
+            "relative_humidity_pct": "RH %",
         }
     )
 
@@ -1352,33 +1324,142 @@ else:
 
 
 # ============================================================
-# ALERTING CAPABILITY
+# WILDFIRE ALERT SUBSCRIPTION
 # ============================================================
 
 st.divider()
 
 
 st.subheader(
-    "📱 Alerting Capability"
+    "📱 Wildfire Alert Subscription"
 )
 
 
 st.caption(
-    "The private operational prototype "
-    "includes subscriber-driven SMS alerting "
-    "for zones that become High/Critical, "
-    "increase significantly, or change "
-    "risk category."
+    "Enter a mobile number to receive wildfire alerts when a zone "
+    "becomes High/Critical, increases significantly, or changes risk category."
 )
 
 
-st.info(
-    "For this public portfolio site, alert "
-    "subscriptions are intentionally disabled. "
-    "The underlying alert workflow was tested "
-    "separately using Databricks, a subscriber "
-    "table, and Twilio."
+phone_number = st.text_input(
+    "Mobile Number",
+    placeholder="+17145551234",
 )
+
+
+agree = st.checkbox(
+    "I agree to receive wildfire situational-awareness SMS alerts."
+)
+
+
+if st.button(
+    "Subscribe to Alerts",
+    use_container_width=True,
+):
+
+    cleaned_phone = (
+        phone_number
+        .strip()
+        .replace(" ", "")
+        .replace("-", "")
+        .replace("(", "")
+        .replace(")", "")
+    )
+
+
+    if not cleaned_phone:
+
+        st.warning(
+            "Enter a mobile number."
+        )
+
+
+    elif not cleaned_phone.startswith("+"):
+
+        st.warning(
+            "Use international format, for example +17145551234."
+        )
+
+
+    elif not cleaned_phone[1:].isdigit():
+
+        st.warning(
+            "Enter a valid phone number using digits only after the + sign."
+        )
+
+
+    elif len(cleaned_phone) < 10 or len(cleaned_phone) > 16:
+
+        st.warning(
+            "Enter a valid international mobile number."
+        )
+
+
+    elif not agree:
+
+        st.warning(
+            "Please confirm that you want to receive alerts."
+        )
+
+
+    else:
+
+        safe_phone = (
+            cleaned_phone
+            .replace("'", "")
+        )
+
+
+        insert_query = f"""
+        INSERT INTO {SUBSCRIBER_TABLE}
+        (
+            phone_number,
+            active,
+            created_at
+        )
+        VALUES
+        (
+            '{safe_phone}',
+            TRUE,
+            current_timestamp()
+        )
+        """
+
+
+        try:
+
+            with get_connection() as conn:
+
+                with conn.cursor() as cursor:
+
+                    cursor.execute(
+                        insert_query
+                    )
+
+
+            masked_phone = (
+                "*" * max(
+                    len(cleaned_phone) - 4,
+                    0
+                )
+                + cleaned_phone[-4:]
+            )
+
+
+            st.success(
+                f"✅ Alert subscription activated for {masked_phone}."
+            )
+
+
+        except Exception as e:
+
+            st.error(
+                "Unable to save the alert subscription."
+            )
+
+            st.code(
+                str(e)
+            )
 
 
 # ============================================================
@@ -1394,29 +1475,24 @@ st.subheader(
 
 
 st.write(
-    "This public-data prototype divides "
-    "western Los Angeles County into "
-    "227 analysis zones and combines "
-    "wildfire hazard, historical fire exposure, "
-    "and near-real-time weather into an "
-    "explainable Operational Wildfire Risk Index."
+    "This public-data prototype divides western Los Angeles County into "
+    "227 analysis zones and combines wildfire hazard, historical fire "
+    "exposure, and near-real-time weather into an explainable "
+    "Operational Wildfire Risk Index."
 )
 
 
 st.write(
-    "The workflow is designed around operational "
-    "situational awareness: detect changing "
-    "conditions, prioritize zones, explain the "
-    "main risk drivers, locate affected areas, "
-    "and support follow-up investigation."
+    "The workflow supports operational situational awareness by helping "
+    "identify changing conditions, prioritize zones, explain the main "
+    "risk drivers, locate affected areas, and trigger alert workflows."
 )
 
 
 st.caption(
-    "Analysis zones are 2 km proxy areas "
-    "created for this prototype and are not "
-    "SCE circuits, service territories, or "
-    "proprietary operational boundaries."
+    "Analysis zones are 2 km proxy areas created for this prototype "
+    "and are not SCE circuits, service territories, or proprietary "
+    "operational boundaries."
 )
 
 
@@ -1428,13 +1504,10 @@ st.divider()
 
 
 st.caption(
-    "Public-data prototype demonstrating how "
-    "geospatial wildfire hazard, historical "
-    "wildfire exposure, and near-real-time "
-    "weather can be integrated into a zone-level "
-    "situational-awareness dataset. "
-    "The Operational Wildfire Risk Index is an "
-    "analytical screening measure and is not "
-    "intended to reproduce SCE proprietary "
-    "wildfire-risk or PSPS decision models."
+    "Public-data prototype demonstrating how geospatial wildfire "
+    "hazard, historical wildfire exposure, and near-real-time weather "
+    "can be integrated into a zone-level situational-awareness dataset. "
+    "The Operational Wildfire Risk Index is an analytical screening "
+    "measure and is not intended to reproduce SCE proprietary wildfire-risk "
+    "or PSPS decision models."
 )
