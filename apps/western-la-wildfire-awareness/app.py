@@ -1210,27 +1210,56 @@ if zone_history.empty:
         "No historical snapshots are available for this zone."
     )
 
-
 else:
 
-    trend_df = (
+    trend_display = (
         zone_history[
             [
                 "pipeline_run_timestamp",
                 "risk_score",
             ]
         ]
-        .set_index(
-            "pipeline_run_timestamp"
-        )
+        .copy()
     )
 
+    trend_display["pipeline_run_timestamp"] = (
+        trend_display["pipeline_run_timestamp"]
+        .dt.tz_convert(
+            "America/Los_Angeles"
+        )
+        .dt.tz_localize(None)
+    )
 
     st.line_chart(
-        trend_df,
+        trend_display,
+        x="pipeline_run_timestamp",
+        y="risk_score",
         use_container_width=True,
     )
 
+    risk_min = (
+        trend_display["risk_score"]
+        .min()
+    )
+
+    risk_max = (
+        trend_display["risk_score"]
+        .max()
+    )
+
+    if risk_min == risk_max:
+
+        st.caption(
+            "Risk score remained stable across recent refreshes; "
+            "underlying weather conditions continue to update."
+        )
+
+    else:
+
+        st.caption(
+            "Risk trend reflects changes in the zone-level operational "
+            "screening score across recent pipeline refreshes."
+        )
 
 # ============================================================
 # OPERATIONAL ALERT PREVIEW
