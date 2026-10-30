@@ -1,11 +1,9 @@
-import os
-
 import pandas as pd
 import pydeck as pdk
 import streamlit as st
 
 from databricks import sql
-from databricks.sdk.core import Config
+from databricks.sdk.core import Config, oauth_service_principal
 
 
 # ============================================================
@@ -21,12 +19,8 @@ st.set_page_config(
 
 
 # ============================================================
-# DATABRICKS CONFIG
+# DATABRICKS TABLES
 # ============================================================
-
-cfg = Config()
-
-WAREHOUSE_ID = os.getenv("WAREHOUSE_ID")
 
 CURRENT_TABLE = (
     "dbw_sce_wildfire_dev.default.wildfire_gold_current"
@@ -41,23 +35,46 @@ SUBSCRIBER_TABLE = (
 )
 
 
+# ============================================================
+# DATABRICKS OAUTH CONNECTION
+# ============================================================
+
 def get_connection():
 
-    if not WAREHOUSE_ID:
-        raise RuntimeError(
-            "WAREHOUSE_ID is not configured."
+    server_hostname = st.secrets[
+        "DATABRICKS_SERVER_HOSTNAME"
+    ]
+
+    http_path = st.secrets[
+        "DATABRICKS_HTTP_PATH"
+    ]
+
+    client_id = st.secrets[
+        "DATABRICKS_CLIENT_ID"
+    ]
+
+    client_secret = st.secrets[
+        "DATABRICKS_CLIENT_SECRET"
+    ]
+
+
+    def credential_provider():
+
+        config = Config(
+            host=f"https://{server_hostname}",
+            client_id=client_id,
+            client_secret=client_secret,
         )
 
-    server_hostname = (
-        cfg.host
-        .replace("https://", "")
-        .replace("http://", "")
-    )
+        return oauth_service_principal(
+            config
+        )
+
 
     return sql.connect(
         server_hostname=server_hostname,
-        http_path=f"/sql/1.0/warehouses/{WAREHOUSE_ID}",
-        credentials_provider=lambda: cfg.authenticate,
+        http_path=http_path,
+        credentials_provider=credential_provider,
         _use_arrow_native_complex_types=False,
     )
 
@@ -1247,9 +1264,6 @@ if st.button(
             .replace("'", "")
         )
 
-
-        # Simple append-only write.
-        # Notebook 12 removes duplicates before sending SMS.
 
         insert_query = f"""
         INSERT INTO {SUBSCRIBER_TABLE}
