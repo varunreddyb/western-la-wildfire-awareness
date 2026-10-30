@@ -30,10 +30,6 @@ HISTORY_TABLE = (
     "dbw_sce_wildfire_dev.default.wildfire_gold_history"
 )
 
-SUBSCRIBER_TABLE = (
-    "dbw_sce_wildfire_dev.default.wildfire_alert_subscribers"
-)
-
 
 # ============================================================
 # DATABRICKS OAUTH CONNECTION
@@ -57,7 +53,6 @@ def get_connection():
         "DATABRICKS_CLIENT_SECRET"
     ]
 
-
     def credential_provider():
 
         config = Config(
@@ -66,10 +61,7 @@ def get_connection():
             client_secret=client_secret,
         )
 
-        return oauth_service_principal(
-            config
-        )
-
+        return oauth_service_principal(config)
 
     return sql.connect(
         server_hostname=server_hostname,
@@ -282,9 +274,35 @@ latest_refresh = (
 )
 
 
+# ============================================================
+# DATA FRESHNESS
+# ============================================================
+
+if pd.notna(latest_refresh):
+
+    now_utc = pd.Timestamp.now(
+        tz="UTC"
+    )
+
+    refresh_age = (
+        now_utc - latest_refresh
+    )
+
+    refresh_hours = (
+        refresh_age.total_seconds()
+        / 3600
+    )
+
+else:
+
+    refresh_hours = None
+
+
 with header_right:
 
-    st.write("**Last Updated**")
+    st.write(
+        "**Last Updated**"
+    )
 
     if pd.notna(latest_refresh):
 
@@ -303,7 +321,9 @@ with header_right:
 
     else:
 
-        st.write("Unavailable")
+        st.write(
+            "Unavailable"
+        )
 
 
 # ============================================================
@@ -337,7 +357,24 @@ largest_increase = (
 )
 
 
-k1, k2, k3, k4 = st.columns(4)
+if refresh_hours is not None:
+
+    if refresh_hours < 1:
+
+        freshness_text = "< 1 hr"
+
+    else:
+
+        freshness_text = (
+            f"{refresh_hours:.1f} hrs"
+        )
+
+else:
+
+    freshness_text = "Unavailable"
+
+
+k1, k2, k3, k4, k5 = st.columns(5)
 
 
 k1.metric(
@@ -361,6 +398,12 @@ k3.metric(
 k4.metric(
     "Largest Risk Increase",
     f"{largest_increase:+.1f}",
+)
+
+
+k5.metric(
+    "Data Freshness",
+    freshness_text,
 )
 
 
@@ -429,28 +472,35 @@ category = selected[
 if category == "Critical":
 
     st.error(
-        f"🔴 Investigating: {selected_zone_label} "
+        f"🔴 Investigating: "
+        f"{selected_zone_label} "
         f"— Critical Risk"
     )
+
 
 elif category == "High":
 
     st.warning(
-        f"🟠 Investigating: {selected_zone_label} "
+        f"🟠 Investigating: "
+        f"{selected_zone_label} "
         f"— High Risk"
     )
+
 
 elif category == "Moderate":
 
     st.info(
-        f"🟡 Investigating: {selected_zone_label} "
+        f"🟡 Investigating: "
+        f"{selected_zone_label} "
         f"— Moderate Risk"
     )
+
 
 else:
 
     st.success(
-        f"🟢 Investigating: {selected_zone_label} "
+        f"🟢 Investigating: "
+        f"{selected_zone_label} "
         f"— Low Risk"
     )
 
@@ -459,7 +509,9 @@ else:
 # MAP VIEW CONTROL
 # ============================================================
 
-st.caption("MAP VIEW")
+st.caption(
+    "MAP VIEW"
+)
 
 
 map_view = st.radio(
@@ -477,7 +529,9 @@ if map_view == "Priority Zones":
 
     map_df = df[
         (
-            df["risk_category"].isin(
+            df[
+                "risk_category"
+            ].isin(
                 [
                     "High",
                     "Critical",
@@ -486,11 +540,15 @@ if map_view == "Priority Zones":
         )
         |
         (
-            df["risk_change"] >= 10
+            df[
+                "risk_change"
+            ] >= 10
         )
         |
         (
-            df["category_changed"] == True
+            df[
+                "category_changed"
+            ] == True
         )
     ].copy()
 
@@ -502,6 +560,7 @@ if map_view == "Priority Zones":
             .head(25)
             .copy()
         )
+
 
 else:
 
@@ -515,23 +574,54 @@ else:
 def map_style(category):
 
     if category == "Critical":
+
         return pd.Series(
-            [183, 28, 28, 235, 1100]
+            [
+                183,
+                28,
+                28,
+                235,
+                1100,
+            ]
         )
+
 
     elif category == "High":
+
         return pd.Series(
-            [230, 81, 0, 225, 900]
+            [
+                230,
+                81,
+                0,
+                225,
+                900,
+            ]
         )
+
 
     elif category == "Moderate":
+
         return pd.Series(
-            [255, 193, 7, 200, 650]
+            [
+                255,
+                193,
+                7,
+                200,
+                650,
+            ]
         )
 
+
     else:
+
         return pd.Series(
-            [46, 125, 50, 155, 450]
+            [
+                46,
+                125,
+                50,
+                155,
+                450,
+            ]
         )
 
 
@@ -545,7 +635,9 @@ map_df[
     ]
 ] = map_df[
     "risk_category"
-].apply(map_style)
+].apply(
+    map_style
+)
 
 
 for col in [
@@ -584,10 +676,22 @@ with map_col:
 
     l1, l2, l3, l4 = st.columns(4)
 
-    l1.markdown("🟢 **Low**")
-    l2.markdown("🟡 **Moderate**")
-    l3.markdown("🟠 **High**")
-    l4.markdown("🔴 **Critical**")
+
+    l1.markdown(
+        "🟢 **Low**"
+    )
+
+    l2.markdown(
+        "🟡 **Moderate**"
+    )
+
+    l3.markdown(
+        "🟠 **High**"
+    )
+
+    l4.markdown(
+        "🔴 **Critical**"
+    )
 
 
     risk_layer = pdk.Layer(
@@ -681,11 +785,15 @@ with map_col:
     tooltip = {
         "html": (
             "<b>{zone_label}</b><br/>"
-            "Risk: <b>{risk_score}</b> ({risk_category})<br/>"
+            "Risk: <b>{risk_score}</b> "
+            "({risk_category})<br/>"
             "Change: <b>{risk_change}</b><br/>"
-            "Wind gust: <b>{wind_gust_mph} mph</b><br/>"
-            "Humidity: <b>{relative_humidity_pct}%</b><br/>"
-            "Temperature: <b>{temperature_f} °F</b>"
+            "Wind gust: "
+            "<b>{wind_gust_mph} mph</b><br/>"
+            "Humidity: "
+            "<b>{relative_humidity_pct}%</b><br/>"
+            "Temperature: "
+            "<b>{temperature_f} °F</b>"
         )
     }
 
@@ -711,8 +819,9 @@ with map_col:
 
 
     st.caption(
-        "Black ring indicates the selected investigation zone. "
-        "Hover over any marker for current conditions."
+        "Black ring indicates the selected "
+        "investigation zone. Hover over any "
+        "marker for current conditions."
     )
 
 
@@ -773,7 +882,9 @@ with table_col:
 
 
     top10["Humidity"] = (
-        top10["relative_humidity_pct"]
+        top10[
+            "relative_humidity_pct"
+        ]
         .round(0)
         .astype("Int64")
     )
@@ -797,7 +908,8 @@ with table_col:
 
 
     st.caption(
-        "Highest-priority zones ranked by current risk score."
+        "Highest-priority zones ranked "
+        "by current risk score."
     )
 
 
@@ -805,41 +917,48 @@ with table_col:
         top10_display,
         use_container_width=True,
         hide_index=True,
+
         column_config={
 
-            "Zone": st.column_config.TextColumn(
-                "Zone",
-                width="large",
-            ),
+            "Zone":
+                st.column_config.TextColumn(
+                    "Zone",
+                    width="large",
+                ),
 
-            "Risk": st.column_config.NumberColumn(
-                "Risk",
-                format="%.1f",
-                width="small",
-            ),
+            "Risk":
+                st.column_config.NumberColumn(
+                    "Risk",
+                    format="%.1f",
+                    width="small",
+                ),
 
-            "Category": st.column_config.TextColumn(
-                "Category",
-                width="small",
-            ),
+            "Category":
+                st.column_config.TextColumn(
+                    "Category",
+                    width="small",
+                ),
 
-            "Δ Risk": st.column_config.NumberColumn(
-                "Δ Risk",
-                format="%+.1f",
-                width="small",
-            ),
+            "Δ Risk":
+                st.column_config.NumberColumn(
+                    "Δ Risk",
+                    format="%+.1f",
+                    width="small",
+                ),
 
-            "Gust": st.column_config.NumberColumn(
-                "Gust",
-                format="%.1f mph",
-                width="small",
-            ),
+            "Gust":
+                st.column_config.NumberColumn(
+                    "Gust",
+                    format="%.1f mph",
+                    width="small",
+                ),
 
-            "Humidity": st.column_config.NumberColumn(
-                "RH",
-                format="%d%%",
-                width="small",
-            ),
+            "Humidity":
+                st.column_config.NumberColumn(
+                    "RH",
+                    format="%d%%",
+                    width="small",
+                ),
         },
     )
 
@@ -906,22 +1025,27 @@ with context_col:
 
 
     st.write(
-        f"**Zone ID:** {selected['zone_id']}"
+        f"**Zone ID:** "
+        f"{selected['zone_id']}"
     )
 
 
     st.write(
-        f"**Location:** {selected['location_name']}"
+        f"**Location:** "
+        f"{selected['location_name']}"
     )
 
 
     st.write(
-        f"**Risk Category:** {selected['risk_category']}"
+        f"**Risk Category:** "
+        f"{selected['risk_category']}"
     )
 
 
     if pd.notna(
-        selected["previous_risk_score"]
+        selected[
+            "previous_risk_score"
+        ]
     ):
 
         st.write(
@@ -931,7 +1055,9 @@ with context_col:
 
 
     if pd.notna(
-        selected["previous_category"]
+        selected[
+            "previous_category"
+        ]
     ):
 
         st.write(
@@ -941,7 +1067,9 @@ with context_col:
 
 
     if pd.notna(
-        selected["hazard_score"]
+        selected[
+            "hazard_score"
+        ]
     ):
 
         st.write(
@@ -951,7 +1079,9 @@ with context_col:
 
 
     if pd.notna(
-        selected["historical_fire_count"]
+        selected[
+            "historical_fire_count"
+        ]
     ):
 
         st.write(
@@ -961,7 +1091,9 @@ with context_col:
 
 
     if pd.notna(
-        selected["historical_burned_acres"]
+        selected[
+            "historical_burned_acres"
+        ]
     ):
 
         st.write(
@@ -971,7 +1103,9 @@ with context_col:
 
 
     if pd.notna(
-        selected["last_fire_year"]
+        selected[
+            "last_fire_year"
+        ]
     ):
 
         st.write(
@@ -981,12 +1115,16 @@ with context_col:
 
 
     if pd.notna(
-        selected["google_maps_url"]
+        selected[
+            "google_maps_url"
+        ]
     ):
 
         st.link_button(
             "📍 Open Zone in Google Maps",
-            selected["google_maps_url"],
+            selected[
+                "google_maps_url"
+            ],
             use_container_width=True,
         )
 
@@ -1013,18 +1151,32 @@ with driver_col:
             ],
 
             "Contribution": [
-                selected["hazard_contribution"],
-                selected["wind_contribution"],
-                selected["humidity_contribution"],
-                selected["temperature_contribution"],
-                selected["history_contribution"],
+                selected[
+                    "hazard_contribution"
+                ],
+                selected[
+                    "wind_contribution"
+                ],
+                selected[
+                    "humidity_contribution"
+                ],
+                selected[
+                    "temperature_contribution"
+                ],
+                selected[
+                    "history_contribution"
+                ],
             ],
         }
     )
 
 
-    driver_df["Contribution"] = pd.to_numeric(
-        driver_df["Contribution"],
+    driver_df[
+        "Contribution"
+    ] = pd.to_numeric(
+        driver_df[
+            "Contribution"
+        ],
         errors="coerce",
     ).fillna(0)
 
@@ -1069,8 +1221,10 @@ zone_history = (
 if zone_history.empty:
 
     st.info(
-        "No historical snapshots are available for this zone."
+        "No historical snapshots "
+        "are available for this zone."
     )
+
 
 else:
 
@@ -1107,8 +1261,9 @@ st.subheader(
 
 alert_df = df[
     (
-        df["risk_category"]
-        .isin(
+        df[
+            "risk_category"
+        ].isin(
             [
                 "High",
                 "Critical",
@@ -1117,11 +1272,15 @@ alert_df = df[
     )
     |
     (
-        df["risk_change"] >= 10
+        df[
+            "risk_change"
+        ] >= 10
     )
     |
     (
-        df["category_changed"] == True
+        df[
+            "category_changed"
+        ] == True
     )
 ].copy()
 
@@ -1129,9 +1288,11 @@ alert_df = df[
 if alert_df.empty:
 
     st.success(
-        "✅ No active High/Critical, major risk-increase, "
-        "or category-change alerts."
+        "✅ No active High/Critical, "
+        "major risk-increase, or "
+        "category-change alerts."
     )
+
 
 else:
 
@@ -1145,8 +1306,9 @@ else:
 
 
     st.warning(
-        f"⚠️ {len(alert_df)} zone(s) currently meet "
-        f"the operational alert criteria."
+        f"⚠️ {len(alert_df)} zone(s) "
+        f"currently meet the operational "
+        f"alert criteria."
     )
 
 
@@ -1161,12 +1323,23 @@ else:
         ]
     ].rename(
         columns={
-            "zone_label": "Zone",
-            "risk_score": "Risk",
-            "risk_category": "Category",
-            "risk_change": "Δ Risk",
-            "wind_gust_mph": "Gust",
-            "relative_humidity_pct": "RH %",
+            "zone_label":
+                "Zone",
+
+            "risk_score":
+                "Risk",
+
+            "risk_category":
+                "Category",
+
+            "risk_change":
+                "Δ Risk",
+
+            "wind_gust_mph":
+                "Gust",
+
+            "relative_humidity_pct":
+                "RH %",
         }
     )
 
@@ -1179,142 +1352,72 @@ else:
 
 
 # ============================================================
-# ALERT SUBSCRIPTION
+# ALERTING CAPABILITY
 # ============================================================
 
 st.divider()
 
 
 st.subheader(
-    "📱 Wildfire Alert Subscription"
+    "📱 Alerting Capability"
 )
 
 
 st.caption(
-    "Enter a mobile number to receive wildfire alerts when a zone "
-    "becomes High/Critical, increases significantly, or changes risk category."
+    "The private operational prototype "
+    "includes subscriber-driven SMS alerting "
+    "for zones that become High/Critical, "
+    "increase significantly, or change "
+    "risk category."
 )
 
 
-phone_number = st.text_input(
-    "Mobile Number",
-    placeholder="+17145551234",
+st.info(
+    "For this public portfolio site, alert "
+    "subscriptions are intentionally disabled. "
+    "The underlying alert workflow was tested "
+    "separately using Databricks, a subscriber "
+    "table, and Twilio."
 )
 
 
-agree = st.checkbox(
-    "I agree to receive wildfire situational-awareness SMS alerts."
+# ============================================================
+# ABOUT THIS PROTOTYPE
+# ============================================================
+
+st.divider()
+
+
+st.subheader(
+    "About this Prototype"
 )
 
 
-if st.button(
-    "Subscribe to Alerts",
-    use_container_width=True,
-):
-
-    cleaned_phone = (
-        phone_number
-        .strip()
-        .replace(" ", "")
-        .replace("-", "")
-        .replace("(", "")
-        .replace(")", "")
-    )
+st.write(
+    "This public-data prototype divides "
+    "western Los Angeles County into "
+    "227 analysis zones and combines "
+    "wildfire hazard, historical fire exposure, "
+    "and near-real-time weather into an "
+    "explainable Operational Wildfire Risk Index."
+)
 
 
-    if not cleaned_phone:
-
-        st.warning(
-            "Enter a mobile number."
-        )
-
-
-    elif not cleaned_phone.startswith("+"):
-
-        st.warning(
-            "Use international format, for example +17145551234."
-        )
+st.write(
+    "The workflow is designed around operational "
+    "situational awareness: detect changing "
+    "conditions, prioritize zones, explain the "
+    "main risk drivers, locate affected areas, "
+    "and support follow-up investigation."
+)
 
 
-    elif not cleaned_phone[1:].isdigit():
-
-        st.warning(
-            "Enter a valid phone number using digits only after the + sign."
-        )
-
-
-    elif len(cleaned_phone) < 10 or len(cleaned_phone) > 16:
-
-        st.warning(
-            "Enter a valid international mobile number."
-        )
-
-
-    elif not agree:
-
-        st.warning(
-            "Please confirm that you want to receive alerts."
-        )
-
-
-    else:
-
-        safe_phone = (
-            cleaned_phone
-            .replace("'", "")
-        )
-
-
-        insert_query = f"""
-        INSERT INTO {SUBSCRIBER_TABLE}
-        (
-            phone_number,
-            active,
-            created_at
-        )
-        VALUES
-        (
-            '{safe_phone}',
-            TRUE,
-            current_timestamp()
-        )
-        """
-
-
-        try:
-
-            with get_connection() as conn:
-
-                with conn.cursor() as cursor:
-
-                    cursor.execute(
-                        insert_query
-                    )
-
-
-            masked_phone = (
-                "*" * max(
-                    len(cleaned_phone) - 4,
-                    0
-                )
-                + cleaned_phone[-4:]
-            )
-
-
-            st.success(
-                f"✅ Alert subscription activated for {masked_phone}."
-            )
-
-
-        except Exception as e:
-
-            st.error(
-                "Unable to save the alert subscription."
-            )
-
-            st.code(
-                str(e)
-            )
+st.caption(
+    "Analysis zones are 2 km proxy areas "
+    "created for this prototype and are not "
+    "SCE circuits, service territories, or "
+    "proprietary operational boundaries."
+)
 
 
 # ============================================================
@@ -1325,10 +1428,13 @@ st.divider()
 
 
 st.caption(
-    "Public-data prototype demonstrating how geospatial wildfire "
-    "hazard, historical wildfire exposure, and near-real-time weather "
-    "can be integrated into a zone-level situational-awareness dataset. "
-    "The Operational Wildfire Risk Index is an analytical screening "
-    "measure and is not intended to reproduce SCE proprietary wildfire-risk "
-    "or PSPS decision models."
+    "Public-data prototype demonstrating how "
+    "geospatial wildfire hazard, historical "
+    "wildfire exposure, and near-real-time "
+    "weather can be integrated into a zone-level "
+    "situational-awareness dataset. "
+    "The Operational Wildfire Risk Index is an "
+    "analytical screening measure and is not "
+    "intended to reproduce SCE proprietary "
+    "wildfire-risk or PSPS decision models."
 )
